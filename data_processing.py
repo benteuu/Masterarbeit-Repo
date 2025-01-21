@@ -6,8 +6,9 @@ import datetime
 import os
 import matplotlib.pyplot as plt
 from geopy.distance import geodesic  # For distance calculation
+from math import atan2, degrees, sin, cos, sqrt, radians
 
-
+#Function for reading data from .plt files
 
 def read_plt(plt_file):
     #print(f"Processing file: {plt_file}")
@@ -43,6 +44,9 @@ def read_plt(plt_file):
 
     return points
 
+
+#If there is a labels file, extract the labels
+
 def read_labels(labels_file):
     labels = pd.read_csv(labels_file, skiprows=1, header=None,
                          parse_dates=[[0, 1], [2, 3]],
@@ -55,6 +59,9 @@ def read_labels(labels_file):
     labels['label'] = [mode_ids[i] for i in labels['label']]
 
     return labels
+
+
+#Put together data for all the users
 
 def read_user(user_folder):
     labels = None
@@ -70,6 +77,9 @@ def read_user(user_folder):
     #    df['label'] = 0
     return df
 
+
+#Read data from all users
+
 def read_all_users(folder):
     subfolders = [f for f in os.listdir(folder) if os.path.isdir(os.path.join(folder, f)) and not f.startswith('.')] #damit ds._store nicht gemacht wird
     dfs = []
@@ -78,5 +88,35 @@ def read_all_users(folder):
         df = read_user(os.path.join(folder,sf))
         df['user'] = int(sf.replace("User", ""))  #hier änderung weil "user" bei ihrem datensatz davor steht
         dfs.append(df)
-        df['time'] = pd.to_datetime(df['time'])
+        df['time'] = pd.to_datetime(df['time'])  #transform data to datetime
     return pd.concat(dfs)
+
+
+def calculations(df):
+    df = df.sort_values(by=['trajectory', 'time'])
+    #initialize
+    df['distance'] = 0.0  # Distance between consecutive points
+    df['speed'] = 0.0     # Speed between consecutive points
+
+    df['time_diff'] = df['time'].diff().dt.total_seconds()
+
+    #Calculate the distance
+    def calculate_distance(lat1, lon1, lat2, lon2):
+
+        # Convert coordinates to radians using NumPy vectorize
+        lat1_rad = np.deg2rad(lat1)
+        lon1_rad = np.deg2rad(lon1)
+        lat2_rad = np.deg2rad(lat2)
+        lon2_rad = np.deg2rad(lon2)
+
+        # Haversine formula
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+        a = np.sin(dlat / 2) ** 2 + np.cos(lat1_rad) * np.cos(lat2_rad) * np.sin(dlon / 2) ** 2
+        c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+        distance = 6371 * c             #radius of earth
+
+        return distance
+    
+    df['distance'] = calculate_distance(df['lat'].shift().values, df['lon'].shift().values, df['lat'].values, df['lon'].values) #shift nimmt immer den vorherigen?
+    return df
