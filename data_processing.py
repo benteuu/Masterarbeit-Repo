@@ -152,3 +152,8 @@ def calculations(df):
     
     df['bearing'] = calculate_bearing(df['lat'].shift().values, df['lon'].shift().values, df['lat'].values, df['lon'].values) #shift nimmt immer den vorherigen?
     return df
+
+
+def plusfour(c):
+    a=c+4
+    return a
