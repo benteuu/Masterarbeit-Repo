@@ -119,4 +119,36 @@ def calculations(df):
         return distance
     
     df['distance'] = calculate_distance(df['lat'].shift().values, df['lon'].shift().values, df['lat'].values, df['lon'].values) #shift nimmt immer den vorherigen?
+
+    df['speed'] = df['distance'] / df['time_diff']
+
+    df['acceleration'] = df['speed'].diff() / df['time_diff']
+
+    def calculate_bearing(lat1, lon1, lat2, lon2):
+        """
+        Calculate the bearing between two geographic points.
+        Parameters:
+        lat1, lon1: Latitude and Longitude of Point 1 (in degrees)
+        lat2, lon2: Latitude and Longitude of Point 2 (in degrees)
+    
+        Returns:
+        Bearing (in degrees)
+        """
+        #Convert latitude and longitude from degrees to radians
+        lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+
+        # Calculate the difference in longitude
+        delta_lon = lon2 - lon1
+
+        # Compute the bearing
+        y = np.sin(delta_lon) * np.cos(lat2)
+        x = np.cos(lat1) * np.sin(lat2) - np.sin(lat1) * np.cos(lat2) * np.cos(delta_lon)
+        bearing = np.arctan2(y, x)
+
+        # Convert bearing from radians to degrees and normalize to 0-360
+        bearing = (np.degrees(bearing) + 360) % 360
+
+        return bearing
+    
+    df['bearing'] = calculate_bearing(df['lat'].shift().values, df['lon'].shift().values, df['lat'].values, df['lon'].values) #shift nimmt immer den vorherigen?
     return df
