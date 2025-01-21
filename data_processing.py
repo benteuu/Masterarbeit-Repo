@@ -151,9 +151,14 @@ def calculations(df):
         return bearing
     
     df['bearing'] = calculate_bearing(df['lat'].shift().values, df['lon'].shift().values, df['lat'].values, df['lon'].values) #shift nimmt immer den vorherigen?
+
+    df['heading_change'] = df.bearing.diff().abs()
+
+    df['Vrate'] = np.abs(df['speed'].diff()) / df['speed']
+
+    df.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+    
+
     return df
 
-
-def plusfour(c):
-    a=c+4
-    return a
