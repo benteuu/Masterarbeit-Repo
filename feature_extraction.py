@@ -50,3 +50,5 @@ def clean_features (features):
     features = features.dropna(axis=0)
 
     return features
+
+#noch ne wrapper function für beide? oder auch für komplette datenverarbeitung
