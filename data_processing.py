@@ -156,9 +156,24 @@ def calculations(df):
 
     df['Vrate'] = np.abs(df['speed'].diff()) / df['speed']
 
+    # Compute angular velocity (change in bearing per second)
+    df['angular_velocity'] = df['bearing'].diff() / df['time_diff']
+
+    # Compute angular acceleration (change in angular velocity per second)
+    df['angular_acceleration'] = df['angular_velocity'].diff() / df['time_diff']
+
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
-    
+
 
     return df
 
+#add 'taxi' to 'car' and 'subway' to 'train' to merge similar classes
+def merge_classes(df):
+    # Merge classes with similar mobility patterns
+    df['label'] = df['label'].replace({
+        'taxi': 'car',
+        'subway': 'train'
+    })
+
+    return df
