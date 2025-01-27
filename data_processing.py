@@ -23,6 +23,38 @@ def read_plt(plt_file):
                         #parse=[[5, 6]]  #veraltet
                         #infer_datetime_format=True)  #veraltet
     )
+    # Combine columns 5 (date) and 6 (time) into a single 'time' column
+    points['time'] = pd.to_datetime(
+        points[5] + " " + points[6],  # Concatenate date and time columns
+        format='%Y-%m-%d %H:%M:%S',  # Specify the datetime format
+        errors='coerce'  # Handle invalid datetime formats gracefully
+    )
+
+
+    #add column with plt number
+    points['trajectory']=os.path.basename(plt_file)
+
+    # for clarity rename columns
+    points.rename(inplace=True, columns={'5_6': 'time', 0: 'lat', 1: 'lon', 3: 'alt', 4:'elapsed time', 7: 'label'})  #hier gibt es einen konflikt wenn man unten das label lesen nicht ausklammert
+    
+    # remove unused columns
+    points.drop(inplace=True, columns=[2,5,6])
+    #print(points)
+
+    return points
+
+def read_plt_full(plt_file):
+    #print(f"Processing file: {plt_file}")
+     # Determine if the file has a header
+    #with open(plt_file, "r") as file: first_line = file.readline().strip()
+    #print (first_line[0])
+    #has_header = not first_line[0].isdigit()   #auslesen ob es einen header gibt
+    #print(has_header)
+    points = pd.read_csv(plt_file,   
+                        skiprows=6,     #erste Zeile überspringen wenn es einen header gibt
+                        header=None        #hier war auf 6 wegen dem was in den orginal datensatz alles da steht
+
+    )
 
     # Combine columns 5 (date) and 6 (time) into a single 'time' column
     points['time'] = pd.to_datetime(
@@ -45,36 +77,55 @@ def read_plt(plt_file):
     return points
 
 
+
 #If there is a labels file, extract the labels
 
 def read_labels(labels_file):
-    labels = pd.read_csv(labels_file, skiprows=1, header=None,
-                         parse_dates=[[0, 1], [2, 3]],
-                         infer_datetime_format=True, delim_whitespace=True)
-
-   #for clarity rename columns
-    labels.columns = ['start_time', 'end_time', 'label']
-
-   #replace 'label' column with integer encoding
-    labels['label'] = [mode_ids[i] for i in labels['label']]
-
+    labels = pd.read_csv(labels_file, skiprows=1, header=None, sep="\t"
+                         #parse_dates=[[0, 1], [2, 3]],
+                         #infer_datetime_format=True
+                         )
+    # Combine date and time columns into a single datetime column
+    labels['start_time'] = pd.to_datetime(labels[0], format='%Y/%m/%d %H:%M:%S')
+    labels['end_time'] = pd.to_datetime(labels[1], format='%Y/%m/%d %H:%M:%S')
+    # Drop the original date and time columns
+    labels.drop(inplace=True, columns=[0, 1])
+    
+    #for clarity rename columns
+    labels.columns = ['label','start_time', 'end_time']
+    
     return labels
+
+
+def apply_labels(points, labels):
+    indices = labels['start_time'].searchsorted(points['time'], side='right') - 1    
+    
+    no_label_condition = (indices < 0) | (points['time'].values >= labels['end_time'].iloc[indices].values)
+    points['label'] = labels['label'].iloc[indices].values
+    points.loc[no_label_condition, 'label'] = 0
+
+
+
 
 
 #Put together data for all the users
 
 def read_user(user_folder):
     labels = None
+    if os.path.exists(os.path.join(user_folder, 'Trajectory')):   #this is how it is differntiated between the full or partial dataset
+        plt_files = glob.glob(os.path.join(user_folder, 'Trajectory', '*.plt'))
+        df = pd.concat([read_plt_full(f) for f in plt_files])
 
-    plt_files = glob.glob(os.path.join(user_folder, '*.plt'))    #'Trajectory' folder raus
-    df = pd.concat([read_plt(f) for f in plt_files])
-
-    #labels_file = os.path.join(user_folder, 'labels.txt')    #ich glaub das hier ist alles unnötig weil ich nur welche mit labels hab
-    #if os.path.exists(labels_file):
-    #    labels = read_labels(labels_file)
-    #    apply_labels(df, labels)
-    #else:
-    #    df['label'] = 0
+        labels_file = os.path.join(user_folder, 'labels.txt')
+        if os.path.exists(labels_file):
+            labels = read_labels(labels_file)
+            apply_labels(df, labels)
+        else:
+            df['label'] = 0
+        return df
+    else:
+        plt_files = glob.glob(os.path.join(user_folder, '*.plt'))    
+        df = pd.concat([read_plt(f) for f in plt_files])
     return df
 
 
@@ -168,12 +219,35 @@ def calculations(df):
 
     return df
 
+
+
 #add 'taxi' to 'car' and 'subway' to 'train' to merge similar classes
-def merge_classes(df):
+# leave out 'run', 'boat', 'airplane', 'motorcycle (small sample size)
+def process_classes(df):
     # Merge classes with similar mobility patterns
     df['label'] = df['label'].replace({
         'taxi': 'car',
         'subway': 'train'
     })
+    #leave out classes with very small sample sizes
 
+    # Exclude data points labeled as 'boat'
+    df = df[df['label'] != 'boat']
+    # Exclude data points labeled as 'run'
+    df = df[df['label'] != 'run']
+    # Exclude data points labeled as 'airplane'
+    df = df[df['label'] != 'airplane']
+    # Exclude data points labeled as 'motorcycle'
+    df = df[df['label'] != 'motorcycle']
+    
+
+    
+
+
+    return df
+
+
+def drop_unlabelled(df):
+    # Drop data points that are not labeled
+    df = df[df['label'] != 0]
     return df
