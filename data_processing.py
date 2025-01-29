@@ -240,14 +240,30 @@ def process_classes(df):
     # Exclude data points labeled as 'motorcycle'
     df = df[df['label'] != 'motorcycle']
     
+    return df
 
-    
+#In the large dataset, not every trajectory has the same label.
+#Thus, the trajectories have to be split in segments with the same label
+def create_segments(df):
+    # Initialize the segment number
+    segment_number = 0
+    # Create a new column for segment numbers
+    df['segment'] = 0
 
+    # Create a boolean mask where the trajectory name or the label changes
+    mask = (df['trajectory'] != df['trajectory'].shift()) | (df['label'] != df['label'].shift())
+
+    # Use cumsum to increment the segment number where the mask is True
+    df['segment'] = mask.cumsum()
 
     return df
+
 
 
 def drop_unlabelled(df):
     # Drop data points that are not labeled
     df = df[df['label'] != 0]
     return df
+
+#def get_unlabelled(df):
+    

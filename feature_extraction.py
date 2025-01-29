@@ -8,6 +8,7 @@ def extract_features(group):
     features = {}
     
     features['label'] = group['label'].iloc[0]
+    features['segment'] = group['segment'].iloc[0]
     # Trajectory-level information
     features['trajectory'] = group['trajectory'].iloc[0]
     features['start_time'] = group['time'].iloc[0].hour  # Extract the hour of the day
