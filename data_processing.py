@@ -242,7 +242,7 @@ def process_classes(df):
     
     return df
 
-#In the large dataset, not every trajectory has the same label.
+#In the large dataset, not every trajectory has the same label. OR more than 20mins passed!
 #Thus, the trajectories have to be split in segments with the same label
 def create_segments(df):
     # Initialize the segment number
