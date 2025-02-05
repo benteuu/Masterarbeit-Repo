@@ -9,7 +9,6 @@ from geopy.distance import geodesic  # For distance calculation
 from math import atan2, degrees, sin, cos, sqrt, radians
 
 #Function for reading data from .plt files
-
 def read_plt(plt_file):
     #print(f"Processing file: {plt_file}")
      # Determine if the file has a header
@@ -142,13 +141,12 @@ def read_all_users(folder):
         df['time'] = pd.to_datetime(df['time'])  #transform data to datetime
     return pd.concat(dfs)
 
-
+#CHANGE -> only for each segment/trajectory!
 def calculations(df):
-    df = df.sort_values(by=['trajectory', 'time'])
+    df = df.sort_values(by=['segment', 'time'])
     #initialize
     df['distance'] = 0.0  # Distance between consecutive points
     df['speed'] = 0.0     # Speed between consecutive points
-
     df['time_diff'] = df['time'].diff().dt.total_seconds()
 
     #Calculate the distance
@@ -213,9 +211,9 @@ def calculations(df):
     # Compute angular acceleration (change in angular velocity per second)
     df['angular_acceleration'] = df['angular_velocity'].diff() / df['time_diff']
 
+    #  Drop infinite and na values from the dataset
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
-
-
+    df.dropna(inplace=True)
 
     return df
 
@@ -229,8 +227,8 @@ def process_classes(df):
         'taxi': 'car',
         'subway': 'train'
     })
-    #leave out classes with very small sample sizes
 
+    #leave out classes with very small sample sizes
     # Exclude data points labeled as 'boat'
     df = df[df['label'] != 'boat']
     # Exclude data points labeled as 'run'
@@ -242,7 +240,7 @@ def process_classes(df):
     
     return df
 
-#In the large dataset, not every trajectory has the same label. OR more than 20mins passed!
+
 #Thus, the trajectories have to be split in segments with the same label
 def create_segments(df):
     # Initialize the segment number
@@ -251,6 +249,7 @@ def create_segments(df):
     df['segment'] = 0
 
     # Create a boolean mask where the trajectory name or the label changes
+    #also add: where 20mins pass
     mask = (df['trajectory'] != df['trajectory'].shift()) | (df['label'] != df['label'].shift())
 
     # Use cumsum to increment the segment number where the mask is True
@@ -265,5 +264,7 @@ def drop_unlabelled(df):
     df = df[df['label'] != 0]
     return df
 
+
+#Get all unlabeled trajectories
 #def get_unlabelled(df):
-    
+
