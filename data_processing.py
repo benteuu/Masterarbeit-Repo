@@ -141,15 +141,17 @@ def read_all_users(folder):
         df['time'] = pd.to_datetime(df['time'])  #transform data to datetime
     return pd.concat(dfs)
 
-#CHANGE -> only for each segment/trajectory!
-def calculations(df):
-    df = df.sort_values(by=['segment', 'time'])
+
+def calculations(df, segment='segment'):
+    df = df.sort_values(by=[segment, 'time'])
     #initialize
     df['distance'] = 0.0  # Distance between consecutive points
     df['speed'] = 0.0     # Speed between consecutive points
-    df['time_diff'] = df['time'].diff().dt.total_seconds()
 
-    #Calculate the distance
+    #keeping the time difference also over segments because it becomes useful later
+    #df['time_diff_tot'] = df['time'].diff().dt.total_seconds()
+
+    #Function to calculate the distance
     def calculate_distance(lat1, lon1, lat2, lon2):
 
         # Convert coordinates to radians using NumPy vectorize
@@ -166,13 +168,8 @@ def calculations(df):
         distance = 6371 * c             #radius of earth
 
         return distance
-    
-    df['distance'] = calculate_distance(df['lat'].shift().values, df['lon'].shift().values, df['lat'].values, df['lon'].values) #shift nimmt immer den vorherigen?
 
-    df['speed'] = df['distance'] / df['time_diff']
-
-    df['acceleration'] = df['speed'].diff() / df['time_diff']
-
+    #Function to calculate Bearing
     def calculate_bearing(lat1, lon1, lat2, lon2):
         """
         Calculate the bearing between two geographic points.
@@ -199,17 +196,33 @@ def calculations(df):
 
         return bearing
     
-    df['bearing'] = calculate_bearing(df['lat'].shift().values, df['lon'].shift().values, df['lat'].values, df['lon'].values) #shift nimmt immer den vorherigen?
+    #Function to apply all the calculations by segment
+    def calculate_segment(group):
+        group['time_diff'] = group['time'].diff().dt.total_seconds()
 
-    df['heading_change'] = df.bearing.diff().abs()
+        group['distance'] = calculate_distance(group['lat'].shift().values, group['lon'].shift().values, group['lat'].values, group['lon'].values) #shift nimmt immer den vorherigen?
 
-    df['Vrate'] = np.abs(df['speed'].diff()) / df['speed']
+        group['speed'] = group['distance'] / group['time_diff']
 
-    # Compute angular velocity (change in bearing per second)
-    df['angular_velocity'] = df['bearing'].diff() / df['time_diff']
+        group['acceleration'] = group['speed'].diff() / group['time_diff']
+    
+        group['bearing'] = calculate_bearing(group['lat'].shift().values, group['lon'].shift().values, group['lat'].values, group['lon'].values) #shift nimmt immer den vorherigen?
 
-    # Compute angular acceleration (change in angular velocity per second)
-    df['angular_acceleration'] = df['angular_velocity'].diff() / df['time_diff']
+        #ist heading chamge so richtig??
+        group['heading_change'] = group.bearing.diff().abs()
+
+        group['Vrate'] = np.abs(group['speed'].diff()) / group['speed']
+
+        # Compute angular velocity (change in bearing per second) NOCHMAL CHECKEN
+        group['angular_velocity'] = group['bearing'].diff() / group['time_diff']
+
+        # Compute angular acceleration (change in angular velocity per second)
+        group['angular_acceleration'] = group['angular_velocity'].diff() / group['time_diff']
+
+        return group
+    
+    #Now process each segment individually
+    df = df.groupby(segment, group_keys=False).apply(calculate_segment)
 
     #  Drop infinite and na values from the dataset
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
@@ -242,15 +255,20 @@ def process_classes(df):
 
 
 #Thus, the trajectories have to be split in segments with the same label
+#Checken ob diese Funtion mit dem klienen Datensatz klappt!
 def create_segments(df):
     # Initialize the segment number
     segment_number = 0
     # Create a new column for segment numbers
     df['segment'] = 0
 
-    # Create a boolean mask where the trajectory name or the label changes
-    #also add: where 20mins pass
-    mask = (df['trajectory'] != df['trajectory'].shift()) | (df['label'] != df['label'].shift())
+    # Create a boolean mask where the trajectory name or the label changes or more than 20mins pass
+
+    mask = (
+        (df['trajectory'] != df['trajectory'].shift()) |  # Trajectory change
+        (df['label'] != df['label'].shift()) |  # Label change
+        (df['time'].diff().dt.total_seconds() > 1800)  # More than 30 minutes (1800 sec)
+    )
 
     # Use cumsum to increment the segment number where the mask is True
     df['segment'] = mask.cumsum()
@@ -266,5 +284,8 @@ def drop_unlabelled(df):
 
 
 #Get all unlabeled trajectories
-#def get_unlabelled(df):
+def get_unlabelled(df):
+    df = df[df['label'] == 0]
+    return df
+
 
