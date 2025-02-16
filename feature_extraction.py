@@ -16,8 +16,25 @@ def extract_features(group):
     
     # Distance-based features
     features['total_distance'] = group['distance'].sum()
-    features['average_speed'] = group['speed'].mean()
+    features['expected_speed'] = group['speed'].mean()
     features['max_speed'] = group['speed'].max()
+    #expectation of speed for analyzing distributions of speed samples
+    # Mean Speed
+    total_time = (group['time'].iloc[-1] - group['time'].iloc[0]).total_seconds() / 3600  # Convert to hours
+    features['mean_speed'] = features['total_distance'] / total_time if total_time > 0 else 0  # Avoid division by zero
+
+    # Top 3 Speeds#
+    sorted_speeds = np.sort(group['speed'].dropna().values)[::-1]  # Sort in descending order
+    features['top_1_speed'] = sorted_speeds[0] if len(sorted_speeds) > 0 else 0
+    features['top_2_speed'] = sorted_speeds[1] if len(sorted_speeds) > 1 else 0
+    features['top_3_speed'] = sorted_speeds[2] if len(sorted_speeds) > 2 else 0
+
+    # Top 3 Accelerations
+    sorted_accelerations = np.sort(group['acceleration'].dropna().values)[::-1]  # Sort in descending order
+    features['top_1_acceleration'] = sorted_accelerations[0] if len(sorted_accelerations) > 0 else 0
+    features['top_2_acceleration'] = sorted_accelerations[1] if len(sorted_accelerations) > 1 else 0
+    features['top_3_acceleration'] = sorted_accelerations[2] if len(sorted_accelerations) > 2 else 0
+
     
     # Time-based features
     duration = (group['time'].iloc[-1] - group['time'].iloc[0]).total_seconds() / 3600  # Duration in hours
