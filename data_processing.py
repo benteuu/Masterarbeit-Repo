@@ -257,6 +257,7 @@ def process_classes(df):
 #Thus, the trajectories have to be split in segments with the same label
 #Checken ob diese Funtion mit dem klienen Datensatz klappt!
 def create_segments(df):
+    df = df.sort_values(by=['trajectory', 'time'])
     # Initialize the segment number
     segment_number = 0
     # Create a new column for segment numbers
